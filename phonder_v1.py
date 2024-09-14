@@ -1,67 +1,54 @@
 import os
 import shodan
-import nmap  # Assure-toi d'avoir le module python-nmap installé
+import socket
+import pywifi
+from pywifi import const
+import requests
+import logging
+import traceback
+
+# Setup logging to capture detailed crash reports
+logging.basicConfig(filename='debug_log.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def clear_console():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def print_colored_text(text):
-    """Imprime le texte avec un dégradé de couleurs horizontal."""
-    num_chars = len(text)
-    # Dégradé de couleurs : Orange, Violet clair, Violet foncé
-    colors = [208, 135, 55]  # Codes de couleur ANSI
-    num_colors = len(colors)
-    
-    color_index = 0
-    color_step = num_chars / (num_colors - 1) if num_colors > 1 else 1
-
-    for i, char in enumerate(text):
-        # Déterminer la couleur en fonction de la position
-        if i >= color_step * (color_index + 1):
-            color_index += 1
-            if color_index >= num_colors:
-                color_index = num_colors - 1
-        color_code = colors[color_index]
-        print(f"\033[38;5;{color_code}m{char}\033[0m", end="")
-    print("\033[0m")  # Réinitialiser la couleur
-
 def banner():
-    text = """
+    print("""
         ██████╗ ██╗  ██╗ ██████╗ ███╗   ██╗██████╗ ███████╗██████╗     ██╗   ██╗ ██╗
         ██╔══██╗██║  ██║██╔═══██╗████╗  ██║██╔══██╗██╔════╝██╔══██╗    ██║   ██║███║
         ██████╔╝███████║██║   ██║██╔██╗ ██║██║  ██║█████╗  ██████╔╝    ██║   ██║╚██║
         ██╔═══╝ ██╔══██║██║   ██║██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗    ╚██╗ ██╔╝ ██║
         ██║     ██║  ██║╚██████╔╝██║ ╚████║██████╔╝███████╗██║  ██║     ╚████╔╝  ██║
         ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝      ╚═══╝   ╚═╝
-                    --𝐁𝐲 𝐍𝟎𝐥𝐞𝐱𝟙𝟗𝟗𝟗--
-    """
-    print_colored_text(text)
+                    --𝐁𝐲 𝐍𝟎𝐥𝐞𝐱𝟙𝟡𝟡𝟡--
+    """)
 
-def menu():
-    """Affiche le menu avec un dégradé de couleurs horizontal."""
-    menu_text = """\
-        ╔════════════(1) Shodan
-        ║
-        ╔════════════(2) Scanner IP
-        ║
-        ╔════════════(3) Identifier un Wi-Fi
-        ║
-        ╚═══(99) exit
-    """
-    print_colored_text(menu_text)
-
+# Function to run Shodan search with consistent error handling
 def run_shodan():
-    api_key = input("Entrez votre clé API Shodan : ")
+    while True:
+        try:
+            api_key = input("Entrez votre clé API Shodan : ").strip()
+            if not api_key:
+                print("La clé API ne peut pas être vide. Veuillez entrer une clé API valide.")
+                continue
+
+            # Initialize Shodan API
+            api = shodan.Shodan(api_key)
+            api.info()  # Test API key validity
+            break  # If API key is valid, exit loop
+        except shodan.APIError as e:
+            logging.error(f"Erreur API Shodan: {e}")
+            print("Clé API invalide. Veuillez réessayer.")
+        except Exception as e:
+            logging.error(f"Unexpected error in run_shodan: {e}")
+            print(f"Une erreur inattendue s'est produite : {e}")
+            logging.error(traceback.format_exc())
+
+    # Domain scan with Shodan
     domain = input("Entrez le nom de domaine pour la recherche Shodan : ")
     try:
-        api = shodan.Shodan(api_key)
         response = api.host(domain)
-        
-        # Afficher la réponse brute pour déboguer
-        print("Réponse brute de Shodan:")
-        print(response)
-        
-        # Afficher les résultats
         print(f"Résultats pour '{domain}':")
         print(f"IP: {response['ip_str']}")
         print(f"Organisation: {response.get('org', 'Non spécifié')}")
@@ -70,48 +57,97 @@ def run_shodan():
         print(f"Ports ouverts: {', '.join(str(port) for port in response.get('ports', []))}")
         print(f"Hostname: {', '.join(response.get('hostnames', []))}")
         print(f"Data: {response.get('data', 'Aucune donnée')}")
-        
     except shodan.APIError as e:
+        logging.error(f"Erreur lors de la recherche Shodan: {e}")
         print(f"Erreur Shodan: {e}")
-    except ValueError as e:
-        print(f"Erreur de traitement des données : {e}")
+    except Exception as e:
+        logging.error(f"Erreur inattendue dans run_shodan: {e}")
+        print(f"Une erreur inattendue s'est produite : {e}")
+        logging.error(traceback.format_exc())
 
-def scan_ip(ip_address):
-    """Scanner les ports d'une IP."""
-    nm = nmap.PortScanner()
-    print(f"Scanning IP: {ip_address}...")
-    nm.scan(ip_address, arguments='-T4 -F')  # Utilisation d'arguments pour scanner les ports
-    print(f"Scan complet pour IP {ip_address}:")
-    print(nm.csv())
+# Function for WiFi scanning with error handling
+def scan_wifi():
+    try:
+        wifi = pywifi.PyWiFi()
+        iface = wifi.interfaces()[0]  # Get first wireless interface
+        iface.scan()  # Start scan
+        results = iface.scan_results()
 
-def identify_wifi():
-    """Identifier les réseaux Wi-Fi disponibles."""
-    if os.name == 'nt':  # Pour Windows
-        os.system('netsh wlan show networks mode=Bssid')
-    else:  # Pour Linux
-        os.system('nmcli dev wifi list')
+        print("Réseaux WiFi trouvés :")
+        for network in results:
+            print(f"SSID: {network.ssid}, Signal: {network.signal}, Auth: {network.auth}")
+    except IndexError:
+        print("Erreur: Aucun adaptateur WiFi trouvé.")
+        logging.error("Erreur: Aucun adaptateur WiFi trouvé.")
+    except Exception as e:
+        logging.error(f"Erreur dans le scan WiFi: {e}")
+        print(f"Erreur dans le scan WiFi: {e}")
+        logging.error(traceback.format_exc())
 
-def start_program(option):
-    if option == "1":
-        run_shodan()
-    elif option == "2":
-        ip_address = input("Entrez l'adresse IP à scanner : ")
-        scan_ip(ip_address)
-    elif option == "3":
-        identify_wifi()
-    elif option == "99":
-        exit()
-    else:
-        print(f"'{option}' ne correspond à aucune commande. Merci de retenter avec autre chose.")
-        main()
+# Function for IP scan
+def scan_ip():
+    try:
+        ip = input("Entrez l'adresse IP à scanner : ")
+        for port in range(20, 1025):  # Scan ports 20 to 1024
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex((ip, port))
+            if result == 0:
+                print(f"Port {port}: Ouvert")
+            sock.close()
+    except socket.error as e:
+        logging.error(f"Erreur lors de la connexion: {e}")
+        print(f"Erreur de connexion à l'IP : {e}")
+        logging.error(traceback.format_exc())
 
-def main():
-    clear_console()
-    banner()
-    while True:
-        menu()
-        choice = input("╚═════> ")
-        start_program(choice)
+# Function for IntelX scanning
+def scan_site_intelx():
+    try:
+        intelx_key = input("Entrez votre clé API IntelX : ").strip()
+        domain = input("Entrez le nom de domaine à analyser : ")
 
-if __name__ == "__main__":
-    main()
+        url = f"https://2.intelx.io/intelx/search?k={intelx_key}&q={domain}&maxresults=10"
+        response = requests.get(url)
+        data = response.json()
+
+        print(f"Données récupérées pour {domain}: {data}")
+    except requests.RequestException as e:
+        logging.error(f"Erreur lors de la requête IntelX : {e}")
+        print(f"Erreur lors de la requête IntelX : {e}")
+        logging.error(traceback.format_exc())
+    except Exception as e:
+        logging.error(f"Erreur inattendue dans scan_site_intelx: {e}")
+        print(f"Erreur inattendue lors de l'analyse IntelX: {e}")
+        logging.error(traceback.format_exc())
+
+# Function for SQL injection scan
+def scan_sql():
+    try:
+        url = input("Entrez l'URL pour tester l'injection SQL : ")
+        payloads = ["'", "' OR '1'='1", "' OR '1'='1' --", '"', '" OR "1"="1', '" OR "1"="1" --']
+
+        for payload in payloads:
+            full_url = url + payload
+            response = requests.get(full_url)
+            if "error" in response.text.lower() or "sql" in response.text.lower():
+                print(f"Possibilité d'injection SQL avec le payload : {payload}")
+    except requests.RequestException as e:
+        logging.error(f"Erreur lors de la requête SQL : {e}")
+        print(f"Erreur lors de la requête SQL : {e}")
+        logging.error(traceback.format_exc())
+    except Exception as e:
+        logging.error(f"Erreur inattendue dans scan_sql: {e}")
+        print(f"Erreur inattendue lors du scan SQL: {e}")
+        logging.error(traceback.format_exc())
+
+# Function for Discord account scan
+def scan_discord_account():
+    try:
+        token = input("Entrez votre token Discord : ")
+        headers = {"Authorization": token}
+        response = requests.get("https://discord.com/api/v9/users/@me", headers=headers)
+
+        if response.status_code == 200:
+            user_data = response.json()
+            print(f"Utilisateur: {user_data['username']}#{user_data['discriminator']}")
+            print(f"ID: {user_data['id']}")
+            print(f"Email:
