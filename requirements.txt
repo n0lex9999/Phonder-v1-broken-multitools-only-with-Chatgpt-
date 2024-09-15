@@ -1,0 +1,3 @@
+shodan
+pywifi
+requests
