@@ -4,4 +4,5 @@ i create this broken multi tools only with chat gpt, lol is fcking broken but i 
 info:
 to scan the IP and others don't leave any space! otherwise it may not work
 
-https://drive.google.com/file/d/1fEbzv3W9igTqDXGoPSeCvSfljdEACdO_/view?usp=drive_link
+proj: https://drive.google.com/file/d/1sijWxRPj_NMuxubjNpl3mBCVdNssGbOv/view?usp=sharing
+sonn: https://drive.google.com/file/d/1uCti8cOkwDfsVIFdbscSomDsB-n0dRMe/view?usp=sharing
